@@ -1,0 +1,162 @@
+// MODEL NAME: Bloodpde_MPC
+// SHORT DESCRIPTION: Simple model of Blood region that calculates the pO2 and pCO2
+// in RBC based on Total O2, CO2, H+, and HCO3. Takes into account temperature
+// dependence of O2/CO2 solubility.
+
+
+//%START BLOOD_MODULE_INFO
+//%REPLACE %O2CO2_Sol%=("O2CO2SolubilityMPC.mod")
+//%REPLACE %RBC_PDE%=("RBCpde_MPC.mpc")
+//%REPLACE %PLASMA_PDE%=("PlasmaPDE_MPC.mpc")
+//%REPLACE %TEMP_CAP%=("Temp_cap_MPC.mod") 
+
+//%GET %RBC_PDE% RBC_MODULE_INFO()
+// pH_pl_Fin(t) dimensionless;  // pH of plasma coming into region at x.min
+//%GET %PLASMA_PDE% PLASMA_MODULE_INFO()
+// pH_pl_Fin(t) dimensionless;  // pH of plasma coming into region at x.min
+//%GET %TEMP_CAP% TEMPERATURE_CAPILLARY_MOD_INFO()
+//%END BLOOD_MODULE_INFO
+
+import nsrunit;
+unit conversion on;
+//%GET %O2CO2_Sol% CELSIUS_DEF()
+
+math Blood_pde_MPC {
+
+//%GET %O2CO2_Sol% TIME_DOMAIN()
+//%GET %O2CO2_Sol% SPATIAL_DOMAIN()
+
+
+//%START SYS_PARAMS
+// System parameters:   *******************************
+real  Rvel = 1.6 dimensionless; // velocity ratio (vrbc/vpl) (unitless)
+real  H = 0.45 dimensionless;   // large vessel hematocrit (unitless)
+real  Hcap = H/(H+(1-H)*Rvel);  // capillary hematocrit (unitless)
+real  Fb = 1.0 ml/(min*g);	// total blood flow  (blood flow per gram tissue)
+real  Fpl = (1-H)*Fb;		// flow of plasma, ml/(min*g)
+real  Frbc = H*Fb;		// flow of RBCs, ml/(min*g)
+real  Vcap = 0.07 ml/g;		// anatomical volume of CAP
+real  Vpl = (1-Hcap)*Vcap;	// anatomical volume of plasma
+real  Vrbc = Hcap*Vcap;		// anatomical volume of RBC
+
+//%END SYS_PARAMS
+ 
+real TempSys_isf(t,x) = 310;
+
+
+
+
+//%START BLOOD_REGION
+//%REPLACE %RBC_PDE%=("RBCpde_MPC.mpc")
+//%REPLACE %PLASMA_PDE%=("PlasmaPDE_MPC.mpc")
+//%REPLACE %TEMP_CAP%=("Temp_cap_MPC.mod")
+
+//%GET %TEMP_CAP% THERM_STD_PARAMS()
+
+//%GET %PLASMA_PDE% PLASMA_INPUT()
+
+// ***** *********** *****************************
+// ***** Plasma region: *******************************
+// *****   *****     ***************************
+
+//%GET %PLASMA_PDE% PLASMA_REGION()
+
+// ****** ********************************
+// ****** RBC region:  ********************************
+// ***** **** ****** *****************************
+//%GET %RBC_PDE% RBC_REGION()
+//%GET %RBC_PDE% RBCpde_initValues("alphaCO2init=alphaCO20","alphaO2init=alphaO20")
+
+//%GET %TEMP_CAP% CAP_FLOW_INPUT()
+//%GET %TEMP_CAP% VARIABLES()
+//%GET %RBC_PDE% RBC_SUBMOD_ASSIGN()
+    O2_pl_in = O2_pl;
+    Hct_in =0.45;     // Hemotocrit used by model and assigned to Hct
+//%GET %TEMP_CAP% VAR_INITS()
+//%GET %TEMP_CAP% THERM_PARAMETERS()
+//%GET %TEMP_CAP% VAR_OUTPUT()
+
+//%GET %PLASMA_PDE% PLASMA_INIT("alphaO2=alphaO20","alphaCO2=alphaCO20")
+ 
+//%GET %PLASMA_PDE% PO2_PCO2("alphaO2=alphaO2Sys","alphaCO2=alphaCO2Sys")
+
+
+ when (t=t.min) {	// Temp CAP PDE INITIAL CONDITIONS
+//%GET %TEMP_CAP% TEMP_CAP_PDE_IC()
+
+ }  // END TEMP CAPPILLARY PDE IC
+
+ when (x=x.min) {	// Temp CAP PDE LEFT BOUNDARY CONDITIONS
+//%GET %TEMP_CAP% TEMP_CAP_PDE_LBC()
+ 
+ }   //  END Temp Capillary PDE BC
+
+ when (x=x.max) {	// Temp CAP PDE RIGHT BOUNDARY CONDITIONS
+//%GET %TEMP_CAP% TEMP_CAP_PDE_RBC()
+ 
+ } // END Temp CAPPILLARY PDE RBC
+
+//%GET %TEMP_CAP% TEMP_CAP_PDES("TempSys_isf_in=TempSys_isf" )
+
+
+//%END BLOOD_REGION
+
+// Flow into RBC and plasma region at x=x.min:
+//%START RBC_FLOW_INPUTS
+// ************** RBC Input at x.min, change as needed: **************************
+real pO2_rbc_Fin(t) = 90 mmHg;  // pO2 coming into RBC region at x.min
+real pCO2_rbc_Fin(t) = 50 mmHg;  // pCO2 coming into RBC region at x.min
+real O2_rbc_Fin(t) = alphaO2Sys(t,x.min)*pO2_rbc_Fin; // free O2 coming into RBC region at x.min needed? 
+real CO2_rbc_Fin(t) = alphaCO2Sys(t,x.min)*pCO2_rbc_Fin; // free CO2 coming into RBC region at x.min needed?
+real pH_rbc_Fin(t) = 7.24;                         // pH coming into RBC region at x.min
+TCO2_rbc_Fin = CO2_rbc_Fin+4*Hb_rbc0*SHbCO2_rbc0;  // TCO2 coming into RBC at x.min
+TO2_rbc_Fin = O2_rbc_Fin+4*Hb_rbc0*SHbO2_rbc0;     // TO2 coming into RBC at x.min
+
+HCO3m_rbc_Fin = K1*CO2_rbc_Fin/Hp_rbc_Fin;  // HCO3m coming into RBC at x.min
+Hp_rbc_Fin = 10^(-pH_rbc_Fin)* (1 M);   // Hp coming into RBC at x.min
+//%END RBC_FLOW_INPUTS
+
+
+//%START PLASMA_FLOW_INPUTS
+// ** Plasma Input at x.min and other regions, change as needed:
+real pO2_pl_Fin(t) = 90 mmHg;  // pO2 coming into plasma region at x.min
+real pCO2_pl_Fin(t) = 50 mmHg;  // pCO2 coming into plasma region at x.min
+real pH_pl_Fin(t) = 7.24;  // pH of plasma coming into region at x.min
+    O2_pl_Fin = pO2_pl_Fin*alphaO2Sys(t,x.min);
+    CO2_pl_Fin = pCO2_pl_Fin*alphaCO2Sys(t,x.min);
+    HCO3m_pl_Fin = K1*CO2_pl_Fin/Hp_pl_Fin;
+    Hp_pl_Fin = 10^(-pH_pl_Fin)* (1 M);
+//%END PLASMA_FLOW_INPUTS
+
+
+//%START PS_VALUES
+// PS values for rbc and capillary membranes:
+    O2PSrbc = 0;
+    O2PScap = 0;
+    CO2PSrbc = 0;
+    CO2PScap = 0;
+    HCO3mPSrbc =0;
+    HpPSrbc = 0;
+    HCO3mPScap =0;
+    HpPScap = 0;
+//%END PS_VALUES
+
+//%START ISF_VALUES 
+// No iteraction with ISF:
+  O2_isf = 0.0;    
+  CO2_isf = 0.0;  
+  Hp_isf = 0;
+  HCO3m_isf = 0;
+//%END ISF_VALUES 
+
+    VWrbc = Vrbc*Wrbc;
+    VWpl = Vpl*Wpl;           // Water fraction of plasma volume.
+    Rcap = 0.63;              // Gibbs-Donnan ratio [H+]pl/[H+]isf
+    TDcap =0;                 // Temp diffusion across cap (capillary) membrane
+    TempSys_capFin = 310;
+    TempExp = 310;
+    Temp_in =TempSys_cap;     // Make sure Temp input is using TempSys_cap
+ 
+
+} // End of Blood pde model
+

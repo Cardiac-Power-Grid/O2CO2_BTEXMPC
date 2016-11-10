@@ -1,0 +1,198 @@
+// MODEL NAME: RBCpde_MPC
+// SHORT DESCRIPTION: Simple model of RBC that calculates the pO2 and pCO2
+// in RBC based on Total O2, CO2, H+, and HCO3. Takes into account temperature
+// dependence of O2/CO2 solubility.
+
+//%START RBC_MODULE_INFO
+// * RBC Variables *:
+// TCO2_rbc(t,x) M;     // Total CO2 in rbc
+// TO2_rbc(t,x) M;     // Total O2 in rbc
+// pCO2_rbc(t,x) mmHg; // free pCO2 in rbc
+// CO2_rbc(t,x) M;     // free CO2 in rbc
+// O2_rbc(t,x) M;      // free O2 in rbc
+// pO2_rbc(t,x) mmHg;  // free pO2 in rbc
+// Hp_rbc(t,x) M;      // H+ conc in RBCs
+// HCO3m_rbc(t,x) M;   // HCO3- in RBCs
+
+// * RBC Input variables *:
+// CO2_pl(t,x) M;     // Free CO2 in plasma
+// O2_pl(t,x) M;      // Free O2 in plasma
+// HCO3m_pl(t,x) M;   // HCO3m in plasma
+// Hp_pl(t,x) M;      // H+ in plasma 
+
+// * RBC Flow input variables (Conc of substrate coming into pipe at x=x.min):
+// HCO3m_rbc_Fin(t) M;  // HCO3- coming into the rbc region (x=x.min)
+// Hp_rbc_Fin(t) M;     // H+ coming into the rbc region (x=x.min)
+// pCO2_rbc_Fin(t) mmHg; // pCO2 coming into the rbc region (x.min), 
+                         // TCO2_rbc_Fin calculted from this and initial SHbCO2_rbc0.
+// pO2_rbc_Fin(t) mmHg;  // pO2 coming into the rbc region (x.min), 
+                         // TO2_rbc_Fin calculted from this and initial SHbO2_rbc0.
+
+//%END RBC_MODULE_INFO
+
+//%REPLACE %O2CO2_Sol%=("O2CO2SolubilityMPC.mod")
+//%REPLACE %TCO2rbc_PDE%=("TCO2PDE_MPC.mod")
+//%REPLACE %CO3_PDE%=("HCO3PDE_MPC.mod")
+
+import nsrunit;
+unit conversion on;
+//%GET %O2CO2_Sol% CELSIUS_DEF()
+
+math RBC_pde_MPC {
+//%GET %TCO2rbc_PDE% TIME_DOMAIN()
+//%GET %TCO2rbc_PDE% SPATIALDOMAIN()
+
+//%GET %CO3_PDE% INPUT("HCO3m_pl_in=HCO3m_pl","Hp_pl_in=Hp_pl")
+
+//%START RBC_REGION
+//%REPLACE %O2CO2_Sol%=("O2CO2SolubilityMPC.mod")
+//%REPLACE %O2freeCalc%=("TotO2freeO2Invert.mpc")
+//%REPLACE %CO2freeCalc%=("TotCO2freeCO2Invert.mpc")
+//%REPLACE %CO3_PDE%=("HCO3PDE_MPC.mod")
+//%REPLACE %TCO2rbc_PDE%=("TCO2PDE_MPC.mod")
+//%REPLACE %TO2rbc_PDE%=("TO2PDE_MPC.mod")
+
+//%GET %CO3_PDE% RXN_PARAMETERS()
+//%GET %CO3_PDE% PARAMS()
+//%GET %TCO2rbc_PDE% PARAMS()
+//%GET %TO2rbc_PDE% PARAMS()
+
+
+//%GET %CO3_PDE% RBC_INPUT("CO2_rbc_in=CO2_rbc")
+//%GET %CO3_PDE% FLOW_INPUT()
+//%GET %TCO2rbc_PDE% INPUT("CO2_pl_in=CO2_pl","CO2_rbc_in=CO2_rbc","HCO3m_rbc_in=HCO3m_rbc","Hp_rbc_in=Hp_rbc")
+//%GET %TCO2rbc_PDE% FLOW_INPUT()
+//%GET %TO2rbc_PDE% INPUT("O2_pl_in=O2_pl","O2_rbc_in=O2_rbc")
+//%GET %TO2rbc_PDE% FLOW_INPUT()
+//%GET %TCO2rbc_PDE% VAR_OUTPUT()
+//%GET %TO2rbc_PDE% VAR_OUTPUT()
+//%GET %TCO2rbc_PDE% VAR_INITS()
+//%GET %TO2rbc_PDE% VAR_INITS()
+//%GET %CO3_PDE% VAR_OUTPUTS()
+
+// ** RBC Variables: **
+real TCO2_rbc(t,x) M;    // Total CO2 in rbc
+real TO2_rbc(t,x) M;     // Total O2 in rbc
+real pCO2_rbc(t,x) mmHg; // free CO2 in rbc
+real pO2_rbc(t,x) mmHg;  // free O2 in rbc
+real pH_rbc(t,x) dimensionless; // pH in rbc
+     pH_rbc = -log(Hp_rbc/(1 M));
+
+//%GET %CO3_PDE% VAR_INITS()
+// ------------------------------------------------------
+// PDE ICs:
+ when (t=t.min) { // PDE RBC ICs
+//%GET %TO2rbc_PDE% TO2_PDE_IC()
+//%GET %TCO2rbc_PDE% TCO2_PDE_IC()
+//%GET %CO3_PDE% PDE_IC()
+ } // End RBC ICs
+
+// PDE BCs:
+ when (x=x.min) { //  Left RBC BCs
+//%GET %TO2rbc_PDE% TO2_PDE_LBC()
+//%GET %TCO2rbc_PDE% TCO2_PDE_LBC()
+//%GET %CO3_PDE% PDE_LBC()
+} // end Left RBC BCs
+
+ when (x=x.max) { //  Right RBC BCs
+//%GET %TO2rbc_PDE% TO2_PDE_RBC()
+//%GET %TCO2rbc_PDE% TCO2_PDE_RBC()
+//%GET %CO3_PDE% PDE_RBC()
+} // end Right RBC BCs
+
+//%GET %TCO2rbc_PDE% TCO2_PDES("HCO3m_rbc_in=HCO3m_rbc","Hp_rbc_in=Hp_rbc","CO2_rbc_in=CO2_rbc","CO2_pl_in=CO2_pl")
+//%GET %TO2rbc_PDE% TO2_PDES("O2_rbc_in=O2_rbc","O2_pl_in=O2_pl")
+//%GET %CO3_PDE% PDES("CO2_rbc_in=CO2_rbc","HCO3m_pl_in=HCO3m_pl","Hp_pl_in=Hp_pl")
+// ------------------------------------------------------
+// Ten iterations done to calc pO2 in rbc
+//%GET %O2freeCalc% O2INVERT()
+// Eight iterations done to calc pCO2 in rbc
+//%GET %CO2freeCalc% CO2INVERT()
+// -----------------------------------
+// Relate module output variables to current variables:
+
+real SHbO2Sys(t,x);  
+ SHbO2Sys = SHbO2_out;    // get value from TotO2freeO2Invert
+real SHbCO2Sys(t,x);  
+ SHbCO2Sys = SHbCO2_out;    // get value from TotCO2freeCO2Invert
+
+//%END RBC_REGION
+
+//%START RBCpde_initValues
+// ****** Initial values: *******
+real SHbO2_rbc0 = 0.970;   // initial SHbO2 
+real SHbCO2_rbc0 = 0.030;   // initial SHbCO2 
+
+real Hb_rbc0 = HbBl/Hct;    // initial Hb conc in RBC 
+pH_rbct0 = 7.24;    // pH_rbc at t=t.min
+
+real pO2rbct0 = 90 mmHg;   // pO2 in rbc at t=0 for all x
+real pCO2rbct0 = 50 mmHg;  // pCO2 in rbc at t=0 for all x
+real alphaCO2init = 2.8472E-5 M/mmHg;
+real alphaO2init = 1.1148E-6 M/mmHg;
+TCO2Crbct0 =alphaCO2init*pCO2rbct0 +4*Hb_rbc0*SHbCO2_rbc0;   // TCO2 in rbc at t=0 for all x
+TO2Crbct0 = alphaO2init*pO2rbct0 +4*Hb_rbc0*SHbO2_rbc0;   // TO2 in rbc at t=0 for all x
+CO2Crbct0 = alphaCO2init*pCO2rbct0;      // CO2 in rbc at t=0 to calc HCO3mCrbct0
+P50_in = 26;     // mmHg, init guess for pO2 (p50 is used)
+//%END RBCpde_initValues
+
+//%START RBC_FLOW_INPUTS
+// ************** RBC Input at x.min, change as needed: **************************
+real pO2_rbc_Fin(t) = pO2rbct0;  // pO2 coming into RBC region at x.min
+real pCO2_rbc_Fin(t) = pCO2rbct0;  // pCO2 coming into RBC region at x.min
+real O2_rbc_Fin(t) = alphaO2Sys(t,x.min)*pO2_rbc_Fin; // free O2 coming into RBC region at x.min needed? 
+real CO2_rbc_Fin(t) = alphaCO2Sys(t,x.min)*pCO2_rbc_Fin; // free CO2 coming into RBC region at x.min needed?
+
+TCO2_rbc_Fin = CO2_rbc_Fin+4*Hb_rbc0*SHbCO2_rbc0;  // TCO2 coming into RBC at x.min
+TO2_rbc_Fin = O2_rbc_Fin+4*Hb_rbc0*SHbO2_rbc0;     // TO2 coming into RBC at x.min
+
+HCO3m_rbc_Fin = HCO3mCrbct0;  // HCO3m coming into RBC at x.min
+Hp_rbc_Fin = HpCrbct0;   // Hp coming into RBC at x.min
+//%END RBC_FLOW_INPUTS
+
+//%START RBC_SUBMOD_ASSIGN
+// Sub-module assignments:
+TotCO2_Invert_in = TCO2_rbc;   // Used by %CO2freeCalc%
+TotO2_Invert_in = TO2_rbc;     // Used by %O2freeCalc%
+
+pCO2_rbc = pCO2_out; // from %CO2freeCalc%
+CO2_rbc = FCO2_out;  // from %CO2freeCalc%
+pO2_rbc = pO2_out;   // from %O2freeCalc%
+O2_rbc = FO2_out;    // from %O2freeCalc%
+
+pO2_CO2_Invert_in = pO2_rbc;  // pO2 used for CO2 inversion is from O2 inversion. 
+pCO2_Invert_in = pCO2_rbc;     // pCO2 used for O2 inversion is from CO2 inversion. 
+pHrbc_in = -log(Hp_rbc/(1 M)); // Used in O2/CO2 inversion
+DPGrbc_in =.00465;   // DPG conc, used in O2/CO2 inversion
+Hbrbc_in = .0052;    // NOT needed, find declaration and remove it.
+pCO2t0_in= pCO2rbct0; // pCO2 init conc, used in O2/CO2 inversion
+
+//%END RBC_SUBMOD_ASSIGN
+
+//%START PS_VALUES
+// -------- Membrane Permeation coefficents: ---------------- 
+ HCO3mPSrbc =0;   // NO PS out of RBCs into plasma
+ CO2PSrbc = 0;    // NO PS out of RBCs into plasma
+ O2PSrbc = 0;    // NO PS out of RBCs into plasma
+ HpPSrbc = 0;    // NO PS out of RBCs into plasma
+//%END PS_VALUES
+
+//%START NON_RBC_ASSIGN 
+// ***** Non RBC input assignments: *******
+ HCO3m_pl = 0;   // NO HCO3m in plasma
+ Hp_pl = 0;      // NO Hp in plasma
+ CO2_pl =0;      // NO CO2 in plasma
+ O2_pl = 0;      // NO O2 in plasma
+
+Frbc =1;      // Flow of RBCs in ml/(min*g)
+Vrbc = 0.01;  // RBC volume in ml/g
+VWrbc = Vrbc*Wrbc;
+Hct_in =0.45;
+// ***** END Non RBC input assignments: *******
+//%END NON_RBC_ASSIGN 
+
+Temp_in=312;     // Physiological temp, Kelvin, function of t,x
+
+
+} // End of model
+

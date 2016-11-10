@@ -1,0 +1,93 @@
+// MODEL NAME: O2CO2_BTEX_MPC
+// SHORT DESCRIPTION: Blood-tissue exchange module modeling the exchange and transport of O2 and CO2 through a tissue region. 
+// Includes HCO3-, H+, temperature, and gas solubility dependency. Four region model: RBC, Plasma, ISF, and PC. SHbO2/CO2
+// dissociation calcs are from Dash et al. 2016. Model is constructed using MPC annotated modules.
+
+
+//%REPLACE %O2CO2_Sol%=("O2CO2SolubilityMPC.mod")
+//%REPLACE %BLOOD_PDE%=("Bloodpde_MPC.mpc")
+//%REPLACE %ISF_PDE%=("ISF_PDE_MPC.mpc")
+//%REPLACE %PC_PDE%=("PC_PDE_MPC.mpc")
+
+import nsrunit;
+unit conversion on;
+//%GET %O2CO2_Sol% CELSIUS_DEF()
+
+//      **********************
+// Variables and inputs for this BTEX model:
+//%GET %BLOOD_PDE% BLOOD_MODULE_INFO()
+//%GET %ISF_PDE% ISF_MODULE_INFO()
+
+//%GET %PC_PDE% PC_MODULE_INFO()
+
+math Blood_pde_MPC {
+
+//%GET %O2CO2_Sol% TIME_DOMAIN()
+//%GET %O2CO2_Sol% SPATIAL_DOMAIN()
+
+
+// ISF, PC VARS declared before plasma (Blood) as need to know about O2_isf, etc.... for PS calcs:
+//%GET %PC_PDE% PC_VARS()
+//%GET %ISF_PDE% ISF_VARS()
+//%GET %BLOOD_PDE% SYS_PARAMS()
+
+
+// ****************************
+// **** Blood region ****
+//  **************************
+
+//%GET %BLOOD_PDE% BLOOD_REGION()
+//%GET %BLOOD_PDE% PS_VALUES()
+
+// ************** RBC Input at x.min, change as needed: **************************
+// Assign the flow input into the tissue (blood in):
+extern real pO2_rbc_Fin(t) mmHg;    // pO2 coming into RBC region at x.min
+extern real pCO2_rbc_Fin(t) mmHg;   // pCO2 coming into RBC region at x.min
+extern real pH_rbc_Fin(t);          // pH coming into RBC region at x.min
+real O2_rbc_Fin(t) = alphaO2Sys(t,x.min)*pO2_rbc_Fin;    // free O2 coming into RBC region at x.min converted to M 
+real CO2_rbc_Fin(t) = alphaCO2Sys(t,x.min)*pCO2_rbc_Fin; // free CO2 coming into RBC region at x.min converted to M 
+     TCO2_rbc_Fin = CO2_rbc_Fin+4*Hb_rbc0*SHbCO2_rbc0;   // TCO2 coming into RBC at x.min
+     TO2_rbc_Fin = O2_rbc_Fin+4*Hb_rbc0*SHbO2_rbc0;      // TO2 coming into RBC at x.min
+     Hp_rbc_Fin = 10^(-pH_rbc_Fin)* (1 M);       // Hp coming into RBC at x.min
+     HCO3m_rbc_Fin = K1*CO2_rbc_Fin/Hp_rbc_Fin;  // HCO2m coming into RBC at x.min
+     TempSys_capFin = 310;                       // Temperature of blood coming into region at x=x.min
+
+// ** Plasma Input at x.min and other regions, change as needed:
+extern real pO2_pl_Fin(t) mmHg;     // pO2 coming into plasma region at x.min
+extern real pCO2_pl_Fin(t) mmHg;    // pCO2 coming into plasma region at x.min
+extern real pH_pl_Fin(t);           // pH coming into plasma region at x.min
+     O2_pl_Fin = pO2_pl_Fin*alphaO2Sys(t,x.min);
+     CO2_pl_Fin = pCO2_pl_Fin*alphaCO2Sys(t,x.min);
+     Hp_pl_Fin = 10^(-pH_pl_Fin)* (1 M);
+     HCO3m_pl_Fin = K1*CO2_pl_Fin/Hp_pl_Fin;  // HCO3m coming into plasma at x.min
+
+// ******************************
+// *** ISF region ****
+// *****************************
+//%GET %ISF_PDE% SOLUBILITY_COEFF()
+//%GET %ISF_PDE% ISF_REGION()
+//%GET %ISF_PDE% SYS_PARAMS()
+//%GET %ISF_PDE% ISF_SYS_PARAMS()
+//%GET %ISF_PDE% ISF_INIT()
+
+//%GET %ISF_PDE% PS_VALUES()
+
+//  ************************
+// *** PC tissue region: ****
+//  **************************
+//%GET %PC_PDE% SOLUBILITY_COEFF()
+//%GET %PC_PDE% PC_REGION()
+//%GET %PC_PDE% SYS_PARAMS()
+//%GET %PC_PDE% PC_SYS_PARAMS()
+//%GET %PC_PDE% PC_INIT()
+//%GET %PC_PDE% PS_VALUES()
+
+    VWrbc = Vrbc*Wrbc;      // Water fraction of rbc volume.
+    VWpl = Vpl*Wpl;         // Water fraction of plasma volume.
+    Rcap = 0.63;            // Gibbs-Donnan ratio [H+]pl/[H+]isf
+    TDcap =0;               // Temp diffusion across cap (capillary) membrane
+    Temp_in =TempSys_cap;   // Make sure Temp input for TO2/TCO2 -> O2/CO2 inversion module is using TempSys_cap
+
+
+
+}

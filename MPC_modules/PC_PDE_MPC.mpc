@@ -1,0 +1,198 @@
+// MODEL NAME: PC_PDE_MPC
+// SHORT DESCRIPTION: Simple model of Parenchymal cell region (PC) that calculates the pO2 and pCO2
+// in PC based on Total O2, CO2, H+, and HCO3. Takes into account temperature
+// dependence of O2/CO2 solubility.
+
+//%REPLACE %HCO3_PC%=("HCO3pc_MPC.mod")
+//%REPLACE %O2CO2_Sol%=("O2CO2SolubilityMPC.mod")
+
+//%START PC_MODULE_INFO
+// * Parenchymal cell (PC) Variables *:
+// TempSys_pc(t,x) K; // Temp in pc
+// CO2_pc(t,x) M;     // Free CO2 in pc 
+// TO2_pc(t,x) M;     // total O2 in pc
+// O2_pc(t,x) M;      // Free O2 in pc
+// HCO3m_pc(t,x) M;   // HCO3m in pc
+// Hp_pc(t,x) M;      // H+ in pc 
+// pH_pc(t,x);        // pH in pc
+// alphaO2Sys_pc(t,x) M/mmHg // O2 Solubility coefficient
+// alphaCO2Sys_pc(t,x) M/mmHg // CO2 Solubility coefficient
+
+// * PC Input variables *:
+// O2Gpc(t,x) ml/min/g;// gulosity for O2 consumption in PCs
+// pCO2_isf(t,x) mmHg; // free pCO2 in ISF
+// CO2_isf(t,x) M;     // free CO2 in ISF
+// O2_isf(t,x) M;      // free O2 in ISF
+// pO2_isf(t,x) mmHg;  // free pO2 in ISF
+// Hp_isf(t,x) M;      // H+ conc in ISF
+// HCO3m_isf(t,x) M;   // HCO3- in ISF
+// TempSys_isf(t,x) K; //  Temperature in isf
+
+// * PC Flow input variables (Conc of substrate coming into pipe at x=x.min):
+//   None, assume no flow in PC.
+//%END PC_MODULE_INFO
+
+import nsrunit;
+unit conversion on;
+//%GET %O2CO2_Sol% CELSIUS_DEF()
+
+math PC_pde_MPC {
+//%GET %HCO3_PC% TIME_DOMAIN()
+//%GET %HCO3_PC% SPATIALDOMAIN()
+
+// ideal gas const
+//%GET %O2CO2_Sol% CONSTS()
+
+//%START PC_VARS
+//%REPLACE %HCO3_PC%=("HCO3pc_MPC.mod")
+//%REPLACE %CO2_PC%=("CO2pc_MPC.mod")
+//%REPLACE %O2_PC%=("O2pc_MPC.mod")
+//%REPLACE %TEMP_PC%=("Temp_pc_MPC.mod")
+//%GET %HCO3_PC% VARIABLES()
+//%GET %CO2_PC% VARIABLES()
+//%GET %O2_PC% VARIABLES()
+//%GET %TEMP_PC% VARIABLES()
+//%END PC_VARS
+
+
+//%GET %O2CO2_Sol% O2CO2SOL_COEFF_PARAMS()
+
+//%START SOLUBILITY_COEFF
+//%REPLACE %CO2_ISF%=("CO2pc_MPC.mod")
+//%REPLACE %O2_ISF%=("O2pc_MPC.mod")
+//%GET %CO2_PC% SOLUBILITY_PARAM("alphaCO2=alphaCO2Sys_pc")
+//%GET %O2_PC% SOLUBILITY_PARAM("alphaO2=alphaO2Sys_pc")
+//%GET %O2CO2_Sol% O2CO2SOL_VARCALCS("O2solSys=O2solSys_pc","CO2solSys=CO2solSys_pc","TempC_Sys=TempC_Sys_pc","TempSys=TempSys_pc","alphaO2Sys=alphaO2Sys_pc","alphaCO2Sys=alphaCO2Sys_pc")
+//%END SOLUBILITY_COEFF
+
+
+//%START PC_INPUTS
+//%REPLACE %HCO3_PC%=("HCO3pc_MPC.mod")
+//%REPLACE %CO2_PC%=("CO2pc_MPC.mod")
+//%REPLACE %O2_PC%=("O2pc_MPC.mod")
+//%GET %HCO3_PC% INPUT("HCO3m_isf_in=HCO3m_isf","Hp_isf_in=Hp_isf")
+//%GET %CO2_PC% INPUT("CO2_isf_in=CO2_isf")
+//%GET %O2_PC% INPUT("O2_isf_in=O2_isf")
+//%END PC_INPUTS
+
+real TempSys_isf(t,x) K;     // Input: Temperature in ISF region
+
+//%GET %TEMP_PC% THERM_STD_PARAMS()
+//%GET %TEMP_PC% VAR_INITS()
+
+//%START PC_REGION
+//%REPLACE %HCO3_PC%=("HCO3pc_MPC.mod")
+//%REPLACE %CO2_PC%=("CO2pc_MPC.mod")
+//%REPLACE %O2_PC%=("O2pc_MPC.mod")
+//%REPLACE %TEMP_PC%=("Temp_pc_MPC.mod")
+// Parenchymal cell region:
+//%GET %HCO3_PC% RXN_PARAMETERS()
+//%GET %HCO3_PC% PARAMS()
+//%GET %CO2_PC% PARAMS()
+//%GET %O2_PC% PARAMS()
+//%GET %TEMP_PC% THERM_PARAMETERS()
+
+//%GET %CO2_PC% CONSUMPTION_VARS()
+//%GET %O2_PC% CONSUMPTION_VARS()
+//%GET %TEMP_PC% HEAT_GAIN("MRO2pc_in=MRO2pc")
+//%GET %O2_PC% PC_Mb_RATE_CONSTS()
+
+//%GET %O2_PC% MbO2_VARS()
+
+//%GET %HCO3_PC% VAR_OUTPUTS()
+//%GET %CO2_PC% VAR_OUTPUT("alphaCO2=alphaCO2Sys_pc")
+//%GET %O2_PC% VAR_OUTPUT("alphaO2=alphaO2Sys_pc")
+
+//%GET %HCO3_PC% VAR_INITS()
+//%GET %CO2_PC% VAR_INITS()
+//%GET %O2_PC% VAR_INITS()
+
+ when (t=t.min) {	// PC INITIAL CONDITIONS
+//%GET %HCO3_PC% PDE_IC()
+//%GET %CO2_PC% CO2_PDE_IC()
+//%GET %O2_PC% O2_PC_IC()
+//%GET %TEMP_PC% TEMP_PC_PDE_IC()
+ } // end pc ICs
+
+ when (x=x.min) {	// PC LEFT BOUNDARY CONDITIONS
+//%GET %HCO3_PC% PDE_LBC()
+//%GET %CO2_PC% CO2_PDE_LBC()
+//%GET %O2_PC% O2_PC_LBC()
+//%GET %TEMP_PC% TEMP_PC_PDE_LBC()
+ } // end pc left BCs
+
+ when (x=x.max) {	// PC RIGHT BOUNDARY CONDITIONS
+//%GET %HCO3_PC% PDE_RBC()
+//%GET %CO2_PC% CO2_PDE_RBC()
+//%GET %O2_PC% O2_PC_RBC()
+//%GET %TEMP_PC% TEMP_PC_PDE_RBC()
+ } // end pc right BCs
+
+//%GET %CO2_PC% CO2_PDES("O2_pc_in=O2_pc","CO2_isf_in=CO2_isf","HCO3m_pc_in=HCO3m_pc","Hp_pc_in=Hp_pc")
+//%GET %HCO3_PC% PDES("CO2_pc_in=CO2_pc","HCO3m_isf_in=HCO3m_isf","Hp_isf_in=Hp_isf")
+//%GET %O2_PC% O2_PC_PDES("O2_isf_in=O2_isf")
+//%GET %TEMP_PC% TEMP_PC_PDES("MRO2pc_in=MRO2pc","TempSys_isf_in=TempSys_isf")
+// ------ End of pc pdes
+
+//%GET %O2_PC% MbO2_BINDING("alphaO2=alphaO2Sys_pc")
+//%GET %O2_PC% O2_CONSUMPTION()
+
+//%END PC_REGION
+
+//%START O2_CO2_SOLUBILITY_INIT
+real alphaO20 = 1.1148E-6;     // Initial solubility
+real alphaCO20 = 2.8472E-5 M/mmHg;  // Solubility of CO2 in pc
+//%END O2_CO2_SOLUBILITY_INIT
+
+//%START PC_INIT
+     pH_pct0 = 7.24;   // Input initial condition
+real pO2pct0 = 90 mmHg;
+real pCO2pct0 = 40 mmHg;
+     O2Cpct0 =  pO2pct0 * alphaO20;
+     CO2Cpct0 = pCO2pct0 * alphaCO20; 
+     KMbO2t0  = (alphaO20*P50Mb)^(-1);
+     SMbO2t0  = KMbO2t0*O2Cpct0/(1+KMbO2t0*O2Cpct0);
+     CMbO2t0  = CMbpc*SMbO2t0;
+     TO2Cpct0 = O2Cpct0+CMbO2t0;
+//%END PC_INIT
+
+
+//%START PC_ASSIGN_INPUTS
+// Set inputs needed by PC modules to whole model variables/params
+    O2_isf = 0;  // M
+    CO2_isf = 0.0;
+    HCO3m_isf = 0;
+    Hp_isf = 0; 
+// ** pc Fin at x.min =0, assume Flow in pc is zero
+//%END PC_ASSIGN_INPUTS
+
+//%START PS_VALUES
+    O2PSpc = 0;
+    CO2PSpc = 0;
+    HCO3mPSpc =0;
+    HpPSpc = 0;
+//%END PS_VALUES
+
+
+//%START SYS_PARAMS
+// System parameters:
+real  H = 0.45 dimensionless;   // large vessel hematocrit (unitless)
+real  Fb = 1.0 ml/(min*g);	// total blood flow  (blood flow per gram tissue)
+      TempExp = 310;
+//%END SYS_PARAMS
+
+//%START PC_SYS_PARAMS
+//real  Fpc = 0;	   // flow of pc, ml/(min*g):  Assume zero, Do not use LSFEA solver if substrate const over all x.
+real  Vpc = 0.01;	        // anatomical volume of pc
+real  Wpc = 0.72;               // fractional water content of pc
+      VWpc = Vpc*Wpc;
+      Rpc = 0.79;               // Gibbs-Donnan ratio [H+]isf/[H+]pc
+      TDpc =0;                  // Temp diffusion across pc (muscle) membrane
+//%END PC_SYS_PARAMS
+
+
+ 
+   TempSys_isf = 310;
+
+} // End of pc pde model
+

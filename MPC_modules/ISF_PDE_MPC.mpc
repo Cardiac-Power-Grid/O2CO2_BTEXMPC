@@ -1,0 +1,209 @@
+// MODEL NAME: ISF_PDE_MPC
+// SHORT DESCRIPTION: Simple model of Intersitial region (ISF) that calculates the pO2 and pCO2
+// in ISF based on Total O2, CO2, H+, and HCO3. Takes into account temperature
+// dependence of O2/CO2 solubility. Uses isf module with renaming.
+
+//%REPLACE %HCO3_ISF%=("HCO3isf_MPC.mod")
+//%REPLACE %O2CO2_Sol%=("O2CO2SolubilityMPC.mod")
+
+//%START ISF_MODULE_INFO
+// * Interstitial fluid (ISF) Variables *:
+// pCO2_isf(t,x) mmHg; // free pCO2 in ISF
+// CO2_isf(t,x) M;     // free CO2 in ISF
+// O2_isf(t,x) M;      // free O2 in ISF
+// pO2_isf(t,x) mmHg;  // free pO2 in ISF
+// Hp_isf(t,x) M;      // H+ conc in ISF
+// pH_isf(t,x) ;       // pH in ISF
+// HCO3m_isf(t,x) M;   // HCO3- in ISF
+// TempSys_isf(t,x) K; //  Temperature in isf
+// alphaO2Sys_isf(t,x) M/mmHg // O2 Solubility coefficient
+// alphaCO2Sys_isf(t,x) M/mmHg // CO2 Solubility coefficient
+
+// * ISF Input variables *:
+// CO2_pl(t,x) M;     // Free CO2 in plasma (pl)
+// O2_pl(t,x) M;      // Free O2 in pl
+// HCO3m_pl(t,x) M;   // HCO3m in pl
+// Hp_pl(t,x) M;      // H+ in pl
+// TempSys_cap(t,x) K;// Temperature in capillary
+
+// TempSys_pc(t,x) K; // Temp in pc (parenchymal cell)
+// CO2_pc(t,x) M;     // Free CO2 in pc 
+// O2_pc(t,x) M;      // Free O2 in pc
+// HCO3m_pc(t,x) M;   // HCO3m in pc
+// Hp_pc(t,x) M;      // H+ in pc 
+
+// * ISF Flow input variables (Conc of substrate coming into pipe at x=x.min):
+//   None, assume no flow in ISF.
+//%END ISF_MODULE_INFO
+
+import nsrunit;
+unit conversion on;
+//%GET %O2CO2_Sol% CELSIUS_DEF()
+
+math ISF_pde_MPC {
+//%GET %HCO3_ISF% TIME_DOMAIN()
+//%GET %HCO3_ISF% SPATIALDOMAIN()
+
+
+
+//%START ISF_INPUTS
+//%REPLACE %HCO3_ISF%=("HCO3isf_MPC.mod")
+//%REPLACE %CO2_ISF%=("CO2isf_MPC.mod")
+//%REPLACE %O2_ISF%=("O2isf_MPC.mod")
+//%REPLACE %TEMP_ISF%=("Temp_isf_MPC.mod")
+//%GET %HCO3_ISF% INPUT("CO2_isf_in=CO2_isf","Hp_pl_in=Hp_pl","Hp_pc_in=Hp_pc","HCO3m_pl_in=HCO3m_pl","HCO3m_pc_in=HCO3m_pc")
+//%GET %CO2_ISF% INPUT("HCO3m_isf_in=HCO3m_isf","Hp_isf_in=Hp_isf","CO2_pl_in = CO2_pl","CO2_pc_in = CO2_pc")
+//%GET %O2_ISF% INPUT("O2_pl_in=O2_pl","O2_pc_in=O2_pc")
+
+//%END ISF_INPUTS
+
+//%GET %TEMP_ISF% INPUTS("TempSys_cap_in=TempSys_cap","TempSys_pc_in=TempSys_pc")
+
+//%GET %TEMP_ISF% THERM_STD_PARAMS()
+//%GET %O2CO2_Sol% CONSTS()
+//%GET %TEMP_ISF% VAR_INITS()
+
+//%START ISF_VARS
+//%REPLACE %HCO3_ISF%=("HCO3isf_MPC.mod")
+//%REPLACE %CO2_ISF%=("CO2isf_MPC.mod")
+//%REPLACE %O2_ISF%=("O2isf_MPC.mod")
+//%REPLACE %TEMP_ISF%=("Temp_isf_MPC.mod")
+//%GET %HCO3_ISF% VARIABLES()
+//%GET %CO2_ISF% VARIABLES()
+//%GET %O2_ISF% VARIABLES()
+//%GET %TEMP_ISF% VARIABLES()
+//%END ISF_VARS
+
+//%GET %O2CO2_Sol% O2CO2SOL_COEFF_PARAMS()
+
+//%START SOLUBILITY_COEFF
+//%REPLACE %CO2_ISF%=("CO2isf_MPC.mod")
+//%REPLACE %O2_ISF%=("O2isf_MPC.mod")
+//%REPLACE %O2CO2_Sol%=("O2CO2SolubilityMPC.mod")
+//%GET %CO2_ISF% SOLUBILITY_PARAM("alphaCO2=alphaCO2Sys_isf")
+//%GET %O2_ISF% SOLUBILITY_PARAM("alphaO2=alphaO2Sys_isf")
+//%GET %O2CO2_Sol% O2CO2SOL_VARCALCS("O2solSys=O2solSys_isf","CO2solSys=CO2solSys_isf","TempC_Sys=TempC_Sys_isf","TempSys=TempSys_isf","alphaO2Sys=alphaO2Sys_isf","alphaCO2Sys=alphaCO2Sys_isf")
+//%END SOLUBILITY_COEFF
+
+//%START ISF_REGION
+//%REPLACE %HCO3_ISF%=("HCO3isf_MPC.mod")
+//%REPLACE %CO2_ISF%=("CO2isf_MPC.mod")
+//%REPLACE %O2_ISF%=("O2isf_MPC.mod")
+//%REPLACE %TEMP_ISF%=("Temp_isf_MPC.mod")
+// ISF region:
+//%GET %HCO3_ISF% RXN_PARAMETERS()
+//%GET %HCO3_ISF% PARAMS()
+//%GET %CO2_ISF% PARAMS()
+//%GET %O2_ISF% PARAMS()
+//%GET %TEMP_ISF% THERM_PARAMETERS()
+
+//%GET %HCO3_ISF% VAR_OUTPUTS()
+//%GET %CO2_ISF% VAR_OUTPUT("alphaCO2=alphaCO2Sys_isf")
+//%GET %O2_ISF% VAR_OUTPUT("alphaO2=alphaO2Sys_isf")
+
+//%GET %HCO3_ISF% VAR_INITS()
+//%GET %CO2_ISF% VAR_INITS()
+//%GET %O2_ISF% VAR_INITS()
+
+ when (t=t.min) {	// ISF INITIAL CONDITIONS
+//%GET %HCO3_ISF% PDE_IC()
+//%GET %CO2_ISF% CO2_PDE_IC()
+//%GET %O2_ISF% O2_ISF_IC()
+//%GET %TEMP_ISF% TEMP_ISF_PDE_IC()
+ } // end ISF ICs
+
+ when (x=x.min) {	// LEFT ISF BOUNDARY CONDITIONS
+//%GET %HCO3_ISF% PDE_LBC()
+//%GET %CO2_ISF% CO2_PDE_LBC()
+//%GET %O2_ISF% O2_ISF_LBC()
+//%GET %TEMP_ISF% TEMP_ISF_PDE_LBC()
+ } // end isf left BCs
+
+ when (x=x.max) {	// RIGHT ISF BOUNDARY CONDITIONS
+//%GET %HCO3_ISF% PDE_RBC()
+//%GET %CO2_ISF% CO2_PDE_RBC()
+//%GET %O2_ISF% O2_ISF_RBC()
+//%GET %TEMP_ISF% TEMP_ISF_PDE_RBC()
+ } // end isf right BCs
+
+// *** ISF PDES:
+//%GET %CO2_ISF% CO2_PDES("HCO3m_isf_in=HCO3m_isf","Hp_isf_in=Hp_isf","CO2_pl_in = CO2_pl","CO2_pc_in = CO2_pc")
+//%GET %HCO3_ISF% PDES("CO2_isf_in=CO2_isf","Hp_pl_in=Hp_pl","Hp_pc_in=Hp_pc","HCO3m_pl_in=HCO3m_pl","HCO3m_pc_in=HCO3m_pc")
+//%GET %O2_ISF% O2_ISF_PDES("O2_pl_in=O2_pl","O2_pc_in=O2_pc")
+//%GET %TEMP_ISF% TEMP_ISF_PDES("TempSys_cap_in=TempSys_cap","TempSys_pc_in=TempSys_pc")
+// ------ End of isf pdes
+
+//%END ISF_REGION
+
+//%START O2_CO2_SOLUBILITY_INIT
+real alphaO20 = 1.1148E-6 M/mmHg;   // Initial solubility of O2 in isf
+real alphaCO20 = 2.8472E-5 M/mmHg;  // Solubility of CO2 in isf
+//%END O2_CO2_SOLUBILITY_INIT
+
+//%START ISF_INIT
+// ISF init values:
+     pH_isft0 = 7.24;   // Input initial condition
+real pO2isft0 = 90 mmHg;
+real pCO2isft0 = 40 mmHg;
+     O2Cisft0 =  pO2isft0 * alphaO20;
+     CO2Cisft0 = pCO2isft0 * alphaCO20; 
+//%END ISF_INIT
+
+
+//%START PS_VALUES
+// PS values for capillary and pc membranes:
+    O2PSpc = 0;
+    O2PScap = 0;
+    CO2PSpc = 0;
+    CO2PScap = 0;
+    HCO3mPSpc =0;
+    HCO3mPScap =0;
+    HpPSpc = 0;
+    HpPScap = 0;
+//%END PS_VALUES
+
+//%START ISF_ASSIGN_INPUTS
+// Inputs for ISF modules:
+    O2_pl =0;  // M
+    CO2_pl =0;
+    HCO3m_pl =0;
+    Hp_pl = 0;  
+    O2_pc =0;
+    CO2_pc=0;
+    Hp_pc =0;
+    HCO3m_pc =0;
+// End of Inputs for ISF modules.
+// ** No isf Input at x.min for PDEs, assume Flow in isf is zero.
+//%END ISF_ASSIGN_INPUTS
+
+//%START SYS_PARAMS
+// System parameters:
+real  H = 0.45 dimensionless;   // large vessel hematocrit (unitless)
+real  Fb = 1.0 ml/(min*g);	// total blood flow  (blood flow per gram tissue)
+//%END SYS_PARAMS
+
+//%START ISF_SYS_PARAMS
+real  Fisf = 0;	     // flow of isf, ml/(min*g): Assume zero, Do not use LSFEA solver if substrate const over all x.
+real  Visf = 0.2;	        // anatomical volume of isf
+real  Wisf = 0.92;              // fractional water content of isf
+      VWisf = Visf*Wisf;
+//%END ISF_SYS_PARAMS
+
+
+//%START CAP_SYS_PARAMS
+      Rcap = 0.63;
+      TDcap =0;                 // Temp (heat) diffusion across cap (capillary) membrane
+      TempSys_cap = 310;
+//%END CAP_SYS_PARAMS
+
+//%START PC_SYS_PARAMS
+      Rpc = 0.79;               // Gibbs-Donnan ratio [H+]isf/[H+]pc
+      TDpc = 0;
+      TempSys_pc = 310;
+//%END PC_SYS_PARAMS
+      TempExp = 310;
+ 
+
+
+} // End of isf pde model
+

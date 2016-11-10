@@ -1,0 +1,79 @@
+
+// Calculate free O2 in blood based on total O2.
+// Compute free O2 and CO2 (or PO2 and PCO2) from total O2 and CO2 (TO2 and TCO2)
+// through numerical inversion method that uses SHbO2CO2_EJAP2016 routine.
+
+
+//%REPLACE %O2CO2_Sol%=("O2CO2SolubilityMPC.mod")
+
+import nsrunit;
+unit conversion on;
+//%GET %O2CO2_Sol% CELSIUS_DEF()
+
+math TotO2_O2InvertMPC {
+
+//%GET %O2CO2_Sol% TIME_DOMAIN()
+//%GET %O2CO2_Sol% SPATIAL_DOMAIN()
+
+//%START O2INVERT
+//%SETGLOBALVAL %R%=("10")
+//%REPLACE %O2invert%=("TotO2_FreeO2.mod")
+//%REPLACE %SHbO2CO2%=("Dash2016SHbO2CO2MPC.mod")
+//%REPLACE %O2CO2_Sol%=("O2CO2SolubilityMPC.mod")
+
+//%REPLACE (%Z%=("_Invert_"))
+//%REPLACE (%CPM%=("c","p","m"))
+//%REPLACE (%N%=("#1#%R%"),%M%=("#0#%R%-1"))
+
+
+//%GET %O2invert% INPUTS("alphaO2_in=alphaO2Sys","alphaCO2_in=alphaCO2Sys","pCO2in=pCO2%Z%in")
+real alphaCO2Sys(t,x) M/mmHg; // solubility of CO2 in plasma.
+//%GET %SHbO2CO2% OTHERINPUTS("Temp=TempSHbO2CO2")
+//%GET %SHbO2CO2% CONSTANTS()
+//%GET %O2invert% InvertOUTPUTS()
+//%GET %O2invert% IterativeVars("pO2c=pO2c_%N%","pO2p=pO2p_%N%","pO2m=pO2m_%N%","dO2totc=dO2tot%N%c","funcO2=funcO2_%N%","dfuncO2=dfuncO2_%N%","pO2new=pO2new_%N%")
+
+
+//%GET %SHbO2CO2% PARAMETERS()
+//%GET %SHbO2CO2% STDCONDITIONS()
+//%GET %SHbO2CO2% PO2INPUT("pO2=pO2_%N%%CPM%")
+
+//%GET %O2invert% CallSHbO2CO2("pO2c=pO2c_%N%","pO2p=pO2p_%N%","pO2m=pO2m_%N%","pCO2in=pCO2%Z%in","pO2_c=pO2_%N%c","pO2_p=pO2_%N%p","pO2_m=pO2_%N%m","pCO2=pCO2_%N%")
+
+// delpCO2_ is the same for all iterations as pCO2 is same for all when inverting TO2 to get pO2.
+//%GET %SHbO2CO2% INTERMEDIATE_VARS("delpCO2=delpCO2_%N%%CPM%","pCO2=pCO2_%N%","Temp=TempSHbO2CO2")
+//%GET %O2CO2_Sol% CONSTS()
+//%GET %O2CO2_Sol% O2CO2SOL_CALCS("TempSys=TempSHbO2CO2")
+
+//%GET %SHbO2CO2% InputConversions("O2=O2_%N%%CPM%","pO2=pO2_%N%%CPM%","CO2=CO2_%N%%CPM%","pCO2=pCO2_%N%","alphaO2=alphaO2Sys", "alphaCO2=alphaCO2Sys")
+//%GET %SHbO2CO2% P50_adj("P501=P501_%N%%CPM%","P502=P502_%N%%CPM%","P503=P503_%N%%CPM%","P504=P504_%N%%CPM%","P50=P50_%N%%CPM%","C50=C50_%N%%CPM%","delpCO2=delpCO2_%N%%CPM%","alphaO2=alphaO2Sys")
+
+//%GET %SHbO2CO2% EquilConsts()
+//%GET %SHbO2CO2% HillCoeff("nH=nH_%N%%CPM%","pO2=pO2_%N%%CPM%")
+//%GET %SHbO2CO2% EQUILK4p("K4p=K4p_%N%%CPM%","C50=C50_%N%%CPM%","O2=O2_%N%%CPM%","CO2=CO2_%N%%CPM%", "nH=nH_%N%%CPM%")
+
+//%GET %SHbO2CO2% HbO2Saturate("KHbO2=KHbO2_%N%%CPM%","SHbO2=SHbO2_%N%%CPM%","K4p=K4p_%N%%CPM%","O2=O2_%N%%CPM%","CO2=CO2_%N%%CPM%")
+//%GET %SHbO2CO2% O2calcs("O2=O2_%N%%CPM%","SHbO2=SHbO2_%N%%CPM%","O2free=O2free_%N%%CPM%","O2bound=O2bound_%N%%CPM%","O2tot=O2tot_%N%%CPM%")
+
+//%GET %O2invert% TotO2InvertCalcs("pO2c=pO2c_%N%","pO2p=pO2p_%N%","pO2m=pO2m_%N%","pO2new_0=pO2new_%M%","pO2old=pO2old_%N%","TotO2in=TotO2_Invert_in","dO2totc=dO2tot%N%c","funcO2=funcO2_%N%","dfuncO2=dfuncO2_%N%","pO2new=pO2new_%N%","errO2=errO2_%N%","O2totc=O2tot_%N%c","O2totp=O2tot_%N%p","O2totm=O2tot_%N%m")
+//%GET %O2invert% FinalResult("pO2new=pO2new_%R%","alphaO2_in=alphaO2Sys","SHbO2=SHbO2_%R%c")
+//%ENDREPLACE
+//%ENDREPLACE
+
+//%END O2INVERT
+
+// Set initial values:
+Hct_in =0.45;
+Temp_in=310;  // Physiological temperature (function of t,x)
+TotO2_Invert_in = 0.02827;
+pCO2_Invert_in = 40;
+pHrbc_in = 7.238;
+DPGrbc_in =.00465; 
+Hbrbc_in = .0052;
+//alphaO2_in = 1.46E-6;
+P50_in = 26.8;
+real pCO2rbct0= 40 mmHg;
+pCO2t0_in= pCO2rbct0;
+
+}
+

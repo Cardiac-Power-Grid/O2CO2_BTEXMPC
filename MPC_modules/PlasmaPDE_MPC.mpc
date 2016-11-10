@@ -1,0 +1,178 @@
+// MODEL NAME: PlasmaPDE_MPC
+// SHORT DESCRIPTION: Simple model of Plasma region that calculates the pO2 and pCO2
+// in RBC based on Total O2, CO2, H+, and HCO3. Takes into account temperature
+// dependence of O2/CO2 solubility.
+
+
+
+//%START PLASMA_MODULE_INFO
+// * Plasma Variables *:
+// CO2_pl(t,x) M;     // CO2 in plasma
+// pCO2_pl(t,x) mmHg; // pCO2 in plasma
+// O2_pl(t,x) M;      // O2 in plasma
+// pO2_pl(t,x) mmHg;  // pO2 in plasma
+// Hp_pl(t,x) M;      // H+ conc in plasma
+// pH_pl(t,x) dimensionless;      // pH in plasma
+// HCO3m_pl(t,x) M;   // HCO3- in plasma
+
+// * Plasma Input variables *:
+// CO2_rbc(t,x) M
+// CO2_isf(t,x) M
+// O2_rbc(t,x) M
+// O2_isf(t,x) M
+// Hp_rbc(t,x) M
+// Hp_isf(t,x) M
+
+// * Plasma Flow input variables (Conc of substrate coming into pipe at x=x.min):
+// HCO3m_rbc_pl(t) M;  // HCO3- coming into the plasma region (x=x.min)
+// Hp_rbc_pl(t) M;     // H+ coming into the plasma region (x=x.min)
+// pCO2_pl_Fin(t) mmHg; // pCO2 coming into the plasma region (x.min), CO2_pl_Fin calculated from this.
+// pO2_pl_Fin(t) mmHg;  // pO2 coming into the plasma region (x.min), O2_pl_Fin calculated from this.
+                        
+//%END PLASMA_MODULE_INFO
+
+
+
+//%REPLACE %HCO3_PLASMA%=("HCO3plasma_MPC.mod")
+
+import nsrunit;
+unit conversion on;
+
+math PLASMA_pde_MPC {
+//%GET %HCO3_PLASMA% TIME_DOMAIN()
+//%GET %HCO3_PLASMA% SPATIALDOMAIN()
+
+//%START PLASMA_INPUT
+//%REPLACE %HCO3_PLASMA%=("HCO3plasma_MPC.mod")
+//%REPLACE %CO2_PLASMA%=("CO2plasma_MPC.mod")
+//%REPLACE %O2_PLASMA%=("O2plasma_MPC.mod")
+//%GET %HCO3_PLASMA% INPUT("HCO3m_rbc_in=HCO3m_rbc","Hp_rbc_in=Hp_rbc","HCO3m_isf_in=HCO3m_isf","Hp_isf_in=Hp_isf")
+//%GET %CO2_PLASMA% INPUT("CO2_rbc_in=CO2_rbc","CO2_isf_in=CO2_isf")
+//%GET %O2_PLASMA% INPUT("O2_rbc_in=O2_rbc","O2_isf_in=O2_isf")
+//%END PLASMA_INPUT
+
+
+
+//%START PLASMA_REGION
+//%REPLACE %HCO3_PLASMA%=("HCO3plasma_MPC.mod")
+//%REPLACE %CO2_PLASMA%=("CO2plasma_MPC.mod")
+//%REPLACE %O2_PLASMA%=("O2plasma_MPC.mod")
+// Plasma region:
+//%GET %HCO3_PLASMA% RXN_PARAMETERS()
+//%GET %HCO3_PLASMA% PARAMS()
+//%GET %CO2_PLASMA% PARAMS()
+//%GET %O2_PLASMA% PARAMS()
+
+//%GET %HCO3_PLASMA% FLOW_INPUT()
+//%GET %CO2_PLASMA% FLOW_INPUT()
+//%GET %O2_PLASMA% FLOW_INPUT()
+
+//%GET %HCO3_PLASMA% VARIABLES()
+//%GET %CO2_PLASMA% VARIABLES()
+//%GET %O2_PLASMA% VARIABLES()
+
+//%GET %HCO3_PLASMA% VAR_OUTPUTS()
+//%GET %CO2_PLASMA% VAR_OUTPUT()
+//%GET %O2_PLASMA% VAR_OUTPUT()
+
+//%GET %HCO3_PLASMA% VAR_INITS()
+//%GET %CO2_PLASMA% VAR_INITS()
+//%GET %O2_PLASMA% VAR_INITS()
+
+ when (t=t.min) {	// Plasma INITIAL CONDITIONS
+//%GET %HCO3_PLASMA% PDE_IC()
+//%GET %CO2_PLASMA% CO2_PDE_IC()
+//%GET %O2_PLASMA% O2_PLASMA_IC()
+ } // end Plasma ICs
+
+ when (x=x.min) {	// LEFT BOUNDARY CONDITIONS
+//%GET %HCO3_PLASMA% PDE_LBC()
+//%GET %CO2_PLASMA% CO2_PDE_LBC()
+//%GET %O2_PLASMA% O2_PLASMA_LBC()
+ } // end Plasma left BCs
+
+ when (x=x.max) {	// RIGHT BOUNDARY CONDITIONS
+//%GET %HCO3_PLASMA% PDE_RBC()
+//%GET %CO2_PLASMA% CO2_PDE_RBC()
+//%GET %O2_PLASMA% O2_PLASMA_RBC()
+ } // end Plasma right BCs
+
+//%GET %CO2_PLASMA% CO2_PDES("CO2_rbc_in=CO2_rbc","CO2_isf_in=CO2_isf","HCO3m_pl_in=HCO3m_pl","Hp_pl_in=Hp_pl")
+//%GET %HCO3_PLASMA% PDES("CO2_pl_in=CO2_pl","HCO3m_rbc_in=HCO3m_rbc","Hp_rbc_in=Hp_rbc","HCO3m_isf_in=HCO3m_isf","Hp_isf_in=Hp_isf")
+//%GET %O2_PLASMA% O2_PLASMA_PDES("O2_rbc_in=O2_rbc","O2_isf_in=O2_isf")
+// ------ End of PLASMA pdes
+
+//%END PLASMA_REGION
+
+real alphaCO2 = 2.8472E-5 M/mmHg;  // Solubility of CO2 in plasma
+real alphaO2 = 1.1148E-6 M/mmHg; // Solubility of O2 in plasma
+
+//%START PLASMA_INIT
+    pH_plt0 = 7.24;   // Input initial condition
+real pO2plt0 = 90 mmHg;
+real pCO2plt0 = 40 mmHg;
+    O2Cplt0 =  pO2plt0 * alphaO2;
+    CO2Cplt0 = pCO2plt0 * alphaCO2; 
+//%END PLASMA_INIT
+
+//%START PO2_PCO2
+real pO2_pl(t,x) mmHg;
+    pO2_pl = O2_pl/alphaO2;
+real pCO2_pl(t,x) mmHg;
+    pCO2_pl = CO2_pl/alphaCO2;
+//%END PO2_PCO2
+  
+    O2PSrbc = 0;
+    O2PScap = 0;
+    CO2PSrbc = 0;
+    CO2PScap = 0;
+    HCO3mPSrbc =0;
+    HpPSrbc = 0;
+    HCO3mPScap =0;
+    HpPScap = 0;
+    
+
+//%START PLASMA_FLOW_INPUTS
+// ** Plasma Input at x.min and other regions, change as needed:
+real pO2_pl_Fin(t) = 90 mmHg;  // pO2 coming into RBC region at x.min
+real pCO2_pl_Fin(t) = 50 mmHg;  // pCO2 coming into RBC region at x.min
+    O2_pl_Fin = pO2_pl_Fin*alphaO2;
+    CO2_pl_Fin = pCO2_pl_Fin*alphaCO2;
+    HCO3m_pl_Fin = .01459;
+    Hp_pl_Fin = 10^(-pH_plt0)* (1 M);
+//%END PLASMA_FLOW_INPUTS
+
+//%START PLASMA_RBC_INPUTS
+// Link module var dependencies with common vars:
+    CO2_rbc =0;
+    O2_rbc =0;
+    HCO3m_rbc =0;   
+    Hp_rbc = 0; 
+//%END PLASMA_RBC_INPUTS
+
+//%START PLASMA_ASSIGN_ISF_INPUTS 
+    CO2_isf =0;
+    O2_isf = 0;
+    HCO3m_isf = 0;   
+    Hp_isf = 0;  
+//%END PLASMA_ASSIGN_ISF_INPUTS  
+
+
+//%START SYS_PARAMS
+// System parameters:
+real  Rvel = 1.6 dimensionless; // velocity ratio (vrbc/vpl) (unitless)
+real  H = 0.45 dimensionless;   // large vessel hematocrit (unitless)
+real  Hcap = H/(H+(1-H)*Rvel);  // capillary hematocrit (unitless)
+real  Fb = 1.0 ml/(min*g),	// total blood flow  (blood flow per gram tissue)
+      Fpl = (1-H)*Fb,		// flow of plasma, ml/(min*g)
+      Frbc = H*Fb,		// flow of RBCs, ml/(min*g)
+      Vcap = 0.07 ml/g,		// anatomical volume of CAP
+      Vpl = (1-Hcap)*Vcap,	// anatomical volume of plasma
+      Wpl = 0.72;               // fractional water content of plasma
+      VWpl = Vpl*Wpl;
+      Rcap = 0.63;
+      Rrbc = 0.69;
+//%END SYS_PARAMS
+
+} // End of Plasma pde model
+
